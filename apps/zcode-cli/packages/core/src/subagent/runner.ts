@@ -125,6 +125,8 @@ export interface ExploreSubagentPortOptions {
   getAllowedTools?: (profile: AgentProfile) => readonly string[];
   inactivityTimeoutMs?: number;
   autoBackgroundMs?: number;
+  /** Nested delegation starts foreground-only; root runtimes may still background agents. */
+  allowBackground?: boolean;
   logger?: Logger;
 }
 
@@ -147,6 +149,20 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
       const backgroundRequested =
         rawRequest.runInBackground === true || profile.background === true;
       if (backgroundRequested) {
+        if (options.allowBackground === false) {
+          throw createCoreError(
+            CoreErrorType.ToolExecutionFailed,
+            "Nested subagents do not support background execution. Run this agent in the foreground.",
+            {
+              context: {
+                code: AgentErrorCode.BACKGROUND_UNAVAILABLE,
+                agentType: rawRequest.agentType,
+                parentToolCallId: rawRequest.parentToolCallId,
+              },
+              recoverable: true,
+            },
+          );
+        }
         if (launchOptions?.modelOverride?.background === "deny") {
           // 单次执行的模型与动态鉴权不能脱离父 loop 生命周期进入后台。
           throw createCoreError(

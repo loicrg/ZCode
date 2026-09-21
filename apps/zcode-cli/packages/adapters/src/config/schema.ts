@@ -39,6 +39,10 @@ const featuresSchema = z.object({
   mcp: z.boolean().optional(),
 });
 
+const subagentsSchema = z.object({
+  maxDepth: positiveIntegerSchema.optional(),
+});
+
 const memorySchema = z.object({
   use: z.boolean().optional(),
 });
@@ -291,6 +295,7 @@ export const ZCodeConfigFileSchema = z
     storage: storageSchema.optional(),
     network: networkSchema.optional(),
     features: featuresSchema.optional(),
+    subagents: subagentsSchema.optional(),
     memory: memorySchema.optional(),
     mcp: mcpSchema.optional(),
     plugins: pluginsSchema.optional(),
@@ -403,6 +408,7 @@ function parsedConfigFileToRuntimePatch(parsed: ZCodeConfigFile): RuntimeConfigP
   if (parsed.storage) config.storage = parsed.storage;
   if (parsed.network) config.network = parsed.network;
   if (parsed.features) config.features = parsed.features;
+  if (parsed.subagents) config.subagents = parsed.subagents;
   if (parsed.memory) config.memory = parsed.memory;
   if (parsed.mcp) config.mcp = parsed.mcp;
   if (parsed.plugins) config.plugins = normalizePluginConfig(parsed.plugins);

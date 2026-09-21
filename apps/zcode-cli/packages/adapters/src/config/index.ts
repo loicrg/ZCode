@@ -127,6 +127,9 @@ class ConfigStore {
       if (config.features.mcp !== undefined)
         this.set(ConfigKey.FeatureMcp, config.features.mcp, scope);
     }
+    if (config.subagents?.maxDepth !== undefined) {
+      this.set(ConfigKey.SubagentsMaxDepth, config.subagents.maxDepth, scope);
+    }
     if (config.memory) {
       if (config.memory.use !== undefined) this.set(ConfigKey.MemoryUse, config.memory.use, scope);
     }
@@ -288,6 +291,10 @@ export class ConfigPortImpl implements ConfigPort {
         skill: this.store.get(ConfigKey.FeatureSkill) ?? true,
         mcp: this.store.get(ConfigKey.FeatureMcp) ?? true,
       },
+      subagents: {
+        maxDepth:
+          this.store.get(ConfigKey.SubagentsMaxDepth) ?? DefaultConfig.subagents.maxDepth,
+      },
       memory: {
         use: this.store.get(ConfigKey.MemoryUse) ?? DefaultConfig.memory.use,
       },
@@ -405,6 +412,8 @@ function getDefaultValue(key: ConfigKey): unknown {
       return defaults.features.skill;
     case ConfigKey.FeatureMcp:
       return defaults.features.mcp;
+    case ConfigKey.SubagentsMaxDepth:
+      return defaults.subagents.maxDepth;
     case ConfigKey.MemoryUse:
       return defaults.memory.use;
     case ConfigKey.McpServers:

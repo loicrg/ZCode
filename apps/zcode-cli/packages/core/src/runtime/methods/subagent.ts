@@ -64,10 +64,18 @@ export function createDefaultSubagentPort(
     return undefined;
   }
 
+  const currentSubagentDepth = normalizeSubagentDepth(this.config.subagentDepth);
+  const maxSubagentDepth = normalizeSubagentMaxDepth(this.config.subagents?.maxDepth);
+  const childSubagentDepth = currentSubagentDepth + 1;
+  const childCanDelegate =
+    maxSubagentDepth === undefined || childSubagentDepth < maxSubagentDepth;
+  const allowBackground = currentSubagentDepth === 0;
+
   return createExploreSubagentPort({
     logger: this.logger,
     inactivityTimeoutMs: this.config.subagents?.inactivityTimeoutMs,
-    autoBackgroundMs: this.config.subagents?.autoBackgroundMs,
+    autoBackgroundMs: allowBackground ? this.config.subagents?.autoBackgroundMs : undefined,
+    allowBackground,
     outputRootDir: this.config.subagents?.outputRootDir,
     profiles: this.config.subagents?.profiles,
     builtInModelSelectionOverrides: this.config.subagents?.builtInModelSelectionOverrides,
@@ -165,6 +173,7 @@ export function createDefaultSubagentPort(
         this,
         request,
         childMcpAccess.snapshot?.tools.map((descriptor) => toMcpToolName(descriptor)) ?? [],
+        childCanDelegate,
       );
       validateSubagentMcpRequirements(request, childToolAllowlist, childMcpAccess);
       const childMode = resolveSubagentPermissionMode(
@@ -268,6 +277,7 @@ export function createDefaultSubagentPort(
           agentName: `zcode-${request.agentType}`,
           maxTurns: request.maxTurns ?? this.config.subagents?.maxTurns ?? 4,
           parentSessionId: this.sessionId,
+          subagentDepth: childSubagentDepth,
           taskType: "subagent_child",
           // 动态工作流灰度门必须结构性继承：
           // 父会话关着而子代理开着，等于 Agent 工具变成绕过灰度的后门。默认路径（child 继承
@@ -282,8 +292,8 @@ export function createDefaultSubagentPort(
           embeddedSearchBackend: this.config.embeddedSearchBackend,
           nativeSearchEnhancementsEnabled: this.config.nativeSearchEnhancementsEnabled,
           subagents: {
-            backgroundBashMaxMs: this.config.subagents?.backgroundBashMaxMs,
-            enabled: false,
+            ...this.config.subagents,
+            enabled: childCanDelegate,
           },
           mcp: childMcpAccess.config,
         },
@@ -339,8 +349,17 @@ export function createDefaultSubagentPort(
               // 把它路由到 child publisher。
               await this.notifyEventSinks(event, {
                 ...request.traceContext,
-                sessionId: request.sessionId,
+                sessionId: event.sessionId,
               });
+              // Descendant events already carry their own ledger identity. They must reach
+              // external sinks, but must not be mirrored again as if they came directly
+              // from this child.
+              if (
+                event.sessionId !== request.sessionId ||
+                isDescendantSubagentMirror(event, request.sessionId)
+              ) {
+                return;
+              }
               const mirroredEvent = mirrorSubagentToolEvent(event, {
                 agentId: request.agentId,
                 agentType: request.agentType,
@@ -491,6 +510,7 @@ function resolveSubagentToolAllowlist(
   this: AgentRuntimeInternal,
   request: ExploreSubagentRuntimeRequest,
   visibleMcpToolNames: readonly string[],
+  allowSubagentDispatch: boolean,
 ): readonly string[] {
   const disallowedRules = buildSubagentChildDisallowRules([
     ...(this.config.toolDisallowlist ?? []),
@@ -513,16 +533,45 @@ function resolveSubagentToolAllowlist(
     ];
     return appendCoordinatorResponseTool(
       [...new Set(availableToolNames)]
-        .filter((toolName) => !isSubagentDispatchToolName(toolName))
+        .filter((toolName) => allowSubagentDispatch || !isSubagentDispatchToolName(toolName))
         .filter((toolName) => filterSubagentChildToolNames([toolName], disallowedRules).length > 0),
     );
   }
   if (request.allowedTools.length > 0) {
     return appendCoordinatorResponseTool(
-      filterSubagentChildToolNames(request.allowedTools, disallowedRules),
+      filterSubagentChildToolNames(request.allowedTools, disallowedRules).filter(
+        (toolName) => allowSubagentDispatch || !isSubagentDispatchToolName(toolName),
+      ),
     );
   }
   return appendCoordinatorResponseTool([]);
+}
+
+function normalizeSubagentDepth(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : 0;
+}
+
+function normalizeSubagentMaxDepth(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 1
+    ? Math.floor(value)
+    : undefined;
+}
+
+function isDescendantSubagentMirror(
+  event: { payload: unknown },
+  directChildSessionId: string,
+): boolean {
+  if (typeof event.payload !== "object" || event.payload === null || Array.isArray(event.payload)) {
+    return false;
+  }
+  const payload = event.payload as Record<string, unknown>;
+  if (payload.source === "subagent") return true;
+  return (
+    typeof payload.childSessionId === "string" &&
+    payload.childSessionId !== directChildSessionId
+  );
 }
 
 function filterMcpToolNamesByParentAllowlist(

@@ -166,6 +166,7 @@ export function resolveAppRuntimeConfig(input: {
     subagents: {
       ...options.runtimeConfig?.subagents,
       enabled: options.runtimeConfig?.subagents?.enabled ?? configResult.config.features.subagent,
+      maxDepth: options.runtimeConfig?.subagents?.maxDepth ?? configResult.config.subagents.maxDepth,
       outputRootDir: options.runtimeConfig?.subagents?.outputRootDir ?? subagentOutputRootDir,
       builtInModelSelectionOverrides: {
         ...(input.builtInSubagentModelSelectionOverrides ?? {}),

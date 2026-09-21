@@ -137,6 +137,11 @@ export interface AgentRuntimeConfig {
   };
   subagents?: {
     enabled?: boolean;
+    /**
+     * Optional maximum delegation depth. Direct children are depth 1.
+     * Omitted means delegation depth is unlimited.
+     */
+    maxDepth?: number;
     // foreground subagent 没有任何 child 事件的最大静默时间；默认对齐模型流 idle timeout。
     inactivityTimeoutMs?: number;
     autoBackgroundMs?: number;
@@ -203,6 +208,11 @@ export interface AgentRuntimeConfig {
     timeoutMs?: number;
   };
   parentSessionId?: SessionId;
+  /**
+   * Runtime-owned subagent nesting depth. Root sessions omit it (depth 0);
+   * child runtimes increment it when constructing descendants.
+   */
+  subagentDepth?: number;
   taskType?: SessionTaskType;
   /**
    * 动态工作流灰度门：Host 判定后经

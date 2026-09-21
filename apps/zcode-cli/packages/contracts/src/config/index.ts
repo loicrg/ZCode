@@ -37,6 +37,9 @@ export const ConfigKey = {
   FeatureSkill: "features.skill",
   FeatureMcp: "features.mcp",
 
+  // Subagents
+  SubagentsMaxDepth: "subagents.maxDepth",
+
   // Memory
   MemoryUse: "memory.use",
 
@@ -112,13 +115,15 @@ export type ConfigValue<K extends ConfigKey> = K extends "modelStream.idleTimeou
                   | "skills.enabled"
                   | "skills.includeInstructions"
               ? boolean
-              : K extends "memory.use"
-                ? boolean
-                : K extends "skills.metadataBudget"
-                  ? number
-                  : K extends "skills.roots"
-                    ? string[]
-                    : K extends "skill" | "command"
+              : K extends "subagents.maxDepth"
+                ? number | undefined
+                : K extends "memory.use"
+                  ? boolean
+                  : K extends "skills.metadataBudget"
+                    ? number
+                    : K extends "skills.roots"
+                      ? string[]
+                      : K extends "skill" | "command"
                       ? Record<string, SkillCommandOverride>
                       : K extends "mcp.servers"
                         ? Record<string, McpServerConfig>
@@ -226,6 +231,10 @@ export interface RuntimeConfig {
     skill: boolean;
     mcp: boolean;
   };
+  subagents: {
+    /** Omitted means delegation depth is unlimited. */
+    maxDepth?: number;
+  };
   memory: {
     use: boolean;
   };
@@ -263,6 +272,7 @@ export interface RuntimeConfigPatch {
   storage?: Partial<RuntimeConfig["storage"]>;
   network?: Partial<RuntimeConfig["network"]>;
   features?: Partial<RuntimeConfig["features"]>;
+  subagents?: Partial<RuntimeConfig["subagents"]>;
   memory?: Partial<RuntimeConfig["memory"]>;
   mcp?: Partial<RuntimeConfig["mcp"]>;
   plugins?: Partial<RuntimeConfig["plugins"]>;
@@ -313,6 +323,7 @@ export const DefaultRuntimeConfig: RuntimeConfig = {
     skill: true,
     mcp: true,
   },
+  subagents: {},
   memory: {
     use: true,
   },
